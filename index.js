@@ -1,24 +1,53 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const P = require('pino');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
+const pino = require('pino');
+const qrcode = require('qrcode-terminal');
+
+// === GEMINI API ===
+const GEMINI_API_KEY = "AIzaSyDk5vP8f2_example_YourRealKeyHapa";
+
+async function askGemini(question) {
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: `Wewe ni msaidizi wa Prince Project Consultancy, kampuni ya ujenzi na ushauri wa miradi Tanzania. Jibu kwa Kiswahili fasaha, kifupi na kusaidia. Swali la mteja: ${question}` }]
+        }]
+      })
+    });
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || "Samahani, naomba uniulize tena.";
+  } catch (e) {
+    return "Asante kwa ujumbe. Timu yetu itakujibu hivi karibuni.";
+  }
+}
 
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth');
+  const { state, saveCreds } = await useMultiFileAuthState('./auth');
 
   const sock = makeWASocket({
-    auth: state,
-    logger: P({ level: 'silent' }),
-    printQRInTerminal: false
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" }))
+    },
+    logger: pino({ level: "silent" }),
+    printQRInTerminal: true
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
+  sock.ev.on('connection.update', async (update) => {8
+    const { connection, lastDisconnect, qr } = update;
+    if (qr) {
+      console.log("SCAN HII QR KATIKA WHATSAPP:");
+      qrcode.generate(qr, { small: true });
+    }
     if (connection === 'close') {
       const shouldReconnect = lastDisconnect?.error?.output?.statusCode!== DisconnectReason.loggedOut;
       if (shouldReconnect) startBot();
     } else if (connection === 'open') {
-      console.log('✅ Prince Project Bot is Online!');
+      console.log('✅ PRINCE PROJECT BOT IKO ONLINE 24HRS!');
     }
   });
 
@@ -27,25 +56,21 @@ async function startBot() {
     if (!msg.message || msg.key.fromMe) return;
 
     const from = msg.key.remoteJid;
-    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
+    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || "";
 
-    // BOT LOGIC - PRINCE PROJECT CONSULTANCY
-    let reply = "";
+    if (!text) return;
 
-    const lower = text.toLowerCase();
+    console.log(`Ujumbe: ${text}`);
 
-    if (lower.includes("mambo") || lower.includes("habari") || lower.includes("hello") || lower.includes("hi")) {
-      reply = `Habari! 👋 Karibu Prince Project Consultancy\n\nMimi ni msaidizi wako wa masaa 24.\n\nTunatoa huduma za:\n1. Ushauri wa miradi ya ujenzi\n2. Upimaji na ramani\n3. Usimamizi wa miradi\n4. Nyaraka za zabuni\n\nUnaweza kuniuliza chochote, niko hapa kukusaidia! 🏗️`;
-    } else if (lower.includes("huduma") || lower.includes("service")) {
-      reply = `📋 HUDUMA ZETU - PRINCE PROJECT CONSULTANCY*\n\n✅ Architectural Design\n✅ Structural Design\n✅ Quantity Surveying\n✅ Project Management\n✅ Land Surveying\n✅ NEMC & OSHA Certificates\n\nWasiliana nasi kwa maelezo zaidi!`;
-    } else if (lower.includes("bei") || lower.includes("gharama") || lower.includes("price")) {
-      reply = `Kuhusu gharama, inategemea na ukubwa wa mradi wako.\n\nTuma maelezo ya mradi wako na tutakupa makadirio haraka.\n\nAu piga: +255 xxx xxx xxx`;
-    } else {
-      // AI Response - simple
-      reply = `Asante kwa ujumbe wako: "${text}"\n\nNimepokea. Timu ya Prince Project Consultancy itakujibu hivi karibuni.\n\nKwa haraka zaidi, andika *huduma* kuona huduma zetu.`;
+    // Auto-reply ya haraka
+    if (text.toLowerCase().includes("bei") || text.toLowerCase().includes("gharama")) {
+       await sock.sendMessage(from, { text: "🏗️ *PRINCE PROJECT CONSULTANCY*\n\nGharama inategemea na ukubwa wa mradi.\n\nTuma:\n- Eneo la ujenzi\n- Ukubwa\n- Aina ya jengo\n\nTutakupa makadirio ndani ya dakika 5!" });
+       return;
     }
 
-    await sock.sendMessage(from, { text: reply });
+    // AI Jibu
+    const aiReply = await askGemini(text);
+    await sock.sendMessage(from, { text: aiReply + "\n\n---\n*Prince Project Consultancy* 🏗️\n24Hrs AI Assistant" });
   });
 }
 
