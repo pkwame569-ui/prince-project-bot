@@ -1,6 +1,11 @@
-
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const pino = require('pino');
+const express = require('express');
+
+// Hii ndio inazuia Render kusema Failed deploy
+const app = express();
+app.get('/', (req,res) => res.send('Prince Bot Active ✅'));
+app.listen(process.env.PORT || 10000, () => console.log('Server on 10000'));
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('./auth');
@@ -14,14 +19,22 @@ async function startBot() {
   
   if (!sock.authState.creds.registered) {
     setTimeout(async () => {
-      const code = await sock.requestPairingCode("255764769939");
-      console.log(`\n\n====== PAIRING CODE: ${code} ======\n`);
-    }, 3000);
+      try {
+        const code = await sock.requestPairingCode("255764769939");
+        console.log(`\n====== CODE YAKO: ${code} ======\n`);
+      } catch(e){ 
+        console.log("Subiri... bado inaunganisha", e.message);
+        setTimeout(() => startBot(), 10000);
+      }
+    }, 8000);
   }
 
   sock.ev.on('connection.update', async (u) => {
     if (u.connection === 'open') console.log('✅ BOT ONLINE - PRINCE PROJECT ACTIVE');
-    if (u.connection === 'close' && u.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) startBot();
+    if (u.connection === 'close' && u.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+      console.log('Reconnect...');
+      setTimeout(startBot, 3000);
+    }
   });
   
   sock.ev.on('messages.upsert', async ({ messages }) => {
@@ -30,8 +43,7 @@ async function startBot() {
     const from = m.key.remoteJid;
     const text = m.message.conversation || m.message.extendedTextMessage?.text || "";
     if (!text) return;
-    console.log("UJUMBE:", text);
-    await sock.sendMessage(from, { text: `🏗️ *PRINCE PROJECT CONSULTANCY*\n\nAsante! Nimepokea: "${text}"\n\nTuma eneo + ukubwa wa jengo nikupe gharama ya ramani sasa hivi.\n\nBot 24Hrs Active ✅` });
+    await sock.sendMessage(from, { text: `🏗️ *PRINCE PROJECT CONSULTANCY*\n\nAsante! Nimepokea: "${text}"\nTuma eneo + ukubwa nikupe gharama sasa hivi.\nBot Active ✅` });
   });
 }
 startBot();
