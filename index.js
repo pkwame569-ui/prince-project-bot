@@ -219,8 +219,10 @@ What is your project exactly? Agriculture, Health, Education, or NGO? Tell me I 
 });
 
 client.initialize();
-app.get('/', (req,res)=>{
+app.get('/', (req,res)=>{9
   if(qrCodeData) res.send(`<h2>LM TZ PROJECT 9 LIVE 0795804621 - 5% OFF - NO GROUP REPLY</h2><img src="${qrCodeData}" width="350"/><p>Scan na WhatsApp Business | DM Only</p>`);
   else res.send('Bot inawaka 0795804621 5% OFF NO GROUP... Refresh 10 sec');
 });
 app.listen(PORT, ()=>console.log('Live 9 Services 5% OFF NO GROUP on '+PORT));
+
+app.listen(process.env.PORT || 3000)
