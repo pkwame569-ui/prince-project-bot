@@ -1,56 +1,53 @@
-
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const P = require('pino');
 const express = require('express');
+const QRCode = require('qrcode');
+const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.get('/', (req,res)=> res.send('<h1>LM TZ PROJECT 9 - LIVE</h1><p>Bot: 0795804621</p><p>Group Protection: ON</p>'));
-app.listen(PORT, ()=> console.log(`Server on ${PORT}`));
+let latestQR = null;
 
-const PROJECTS = { 9: { name: "PROJECT 9", price: 10000, discount: 5 } };
-function getPrice(id){
-  const proj = PROJECTS[id];
-  const discountAmount = (proj.price * proj.discount)/100;
-  return { ...proj, finalPrice: proj.price - discountAmount, discountAmount };
-}
+app.get('/', async (req,res)=>{
+  if(req.query.reset === '1'){
+    try{ fs.rmSync('auth_info',{recursive:true, force:true}); }catch{}
+    latestQR = null;
+    return res.send('<h1>Imefutwa! Tafadhali subiri 10sec kisha <a href="/">bonyeza hapa</a> kwa QR mpya</h1><script>setTimeout(()=>location.href="/", 10000)</script>');
+  }
+  if(!latestQR) return res.send('<h1>LM TZ PROJECT 9 - Inatengeneza QR...</h1><p>Refresh baada ya sec 5</p><p>Au kama haionekani, fungua <a href="/?reset=1">/?reset=1</a> kufuta session ya zamani</p><script>setTimeout(()=>location.reload(), 5000)</script>');
+  res.send(`
+    <h1>SCAN HAPA - 0795804621</h1>
+    <img src="${latestQR}" style="width:300px;border:1px solid black"/>
+    <p>Group Protection: ON - Haijibu Group</p>
+    <p><a href="/?reset=1">QR haifanyi kazi? Bonyeza hapa kufuta na kutengeneza mpya</a></p>
+    <script>setTimeout(()=>location.reload(), 25000)</script>
+  `);
+});
+
+app.listen(PORT, ()=> console.log(`Server on ${PORT}`));
 
 async function startBot(){
   const { state, saveCreds } = await useMultiFileAuthState('auth_info');
   const sock = makeWASocket({
     auth: { creds: state.creds, keys: makeCacheableSignalKeyStore(state.keys, P().child({ level: "fatal" })) },
     logger: P({ level: 'silent' }),
-    printQRInTerminal: true,
+    printQRInTerminal: false,
     browser: ["LM TZ PROJECT 9", "Chrome", "1.0.0"]
   });
   sock.ev.on('creds.update', saveCreds);
   sock.ev.on('connection.update', async (update)=>{
-    const { connection, lastDisconnect, qr } = update;
-    if(qr) console.log("SCAN QR KWA 0795804621:", qr);
-    if(connection === 'close'){
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      if(shouldReconnect) startBot();
-    } else if(connection === 'open') console.log('BOT IMEUNGWA 0795804621 LIVE');
+    const { connection, qr } = update;
+    if(qr){ latestQR = await QRCode.toDataURL(qr); console.log('QR mpya'); }
+    if(connection === 'open'){ console.log('IMEUNGWA!'); latestQR = null; }
+    if(connection === 'close'){ const shouldReconnect = update.lastDisconnect?.error?.output?.statusCode!== DisconnectReason.loggedOut; if(shouldReconnect) startBot(); }
   });
-
   sock.ev.on('messages.upsert', async ({ messages })=>{
-    const msg = messages[0];
-    if(!msg.message) return;
+    const msg = messages[0]; if(!msg.message) return;
     const from = msg.key.remoteJid;
-    const isGroup = from.endsWith('@g.us');
-    if(isGroup){ console.log('Group ignored'); return; }
-
+    if(from.endsWith('@g.us')) return; // GROUP PROTECTION ON
     const body = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
-    const text = body.toLowerCase();
-    
-    if(text.includes('9') || text.includes('project') || text.includes('menu')){
-      const data = getPrice(9);
-      await sock.sendMessage(from, { text: `🔥 *LM TZ PROJECT 9* 🔥\n\nBei: ${data.price}\nPunguzo 5%: -${data.discountAmount}\n*Bei ya Leo: ${data.finalPrice} TZS*\n\nNamba: 0795804621\nAndika LIPA` });
-    } else if(text.includes('lipa')){
-      await sock.sendMessage(from, { text: `Tuma 9500 kwa 0795804621 M-Pesa. Tuma screenshot.` });
-    } else {
-      await sock.sendMessage(from, { text: `Karibu! Andika 9 kuona PROJECT 9 na punguzo 5%` });
-    }
+    if(body.toLowerCase().includes('9')) await sock.sendMessage(from, { text: `🔥 PROJECT 9 - Bei 9500 TZS (punguzo 5%) - Lipa 0795804621` });
+    else await sock.sendMessage(from, { text: `Karibu! Andika 9` });
   });
 }
 startBot();
