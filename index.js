@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
+3const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const P = require('pino');
 const express = require('express');
 const QRCode = require('qrcode');
@@ -91,4 +91,18 @@ async function startBot(){
     return sock.sendMessage(from,{text:`Nimekuelewa: "${bodyRaw}" / I understand: "${bodyRaw}"\n\n🇹🇿 Kama mshauri wako: Ukitaka wateja WhatsApp - Bot 1 (150k). Ukitaka mtaji - Grant 6 ($450). Ukitaka kujua mradi unafaa - Feasibility 8 (90k).\n🇬🇧 As advisor: Want customers - Bot 1 (150k). Want capital - Grant 6 ($450). Want viability - Feasibility 8 (90k).\n\n👉 Sisi tutakusaidia kulingana na kampuni yako / We will help according to your company.\n\nNiambie mradi wako ni wa nini? / Tell me your project about?`});
   });
 }
-startBot();
+startBot(); const express = require('express');
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => {
+  res.send('Prince Bot is Alive - LM TZ Bot');
+});
+
+app.get('/ping', (req, res) => {
+  res.status(200).send('OK');
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
