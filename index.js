@@ -6,31 +6,26 @@ const P = require('pino');
 let lastQR = null;
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_mbilao_14_knowledge');
+    const { state, saveCreds } = await useMultiFileAuthState('auth_mbilao_final_99');
     const sock = makeWASocket({ auth: state, logger: P({ level: 'silent' }) });
     sock.ev.on('creds.update', saveCreds);
     sock.ev.on('connection.update', async (u)=>{
         if(u.qr){ lastQR = await QRCode.toDataURL(u.qr); console.log('QR READY /qr'); }
-        if(u.connection==='open'){ console.log('MBILAO KNOWLEDGE BOT CONNECTED ✅'); lastQR=null; }
+        if(u.connection==='open'){ console.log('MBILAO WORLDWIDE CONNECTED ✅'); lastQR=null; }
     });
 
-    // KNOWLEDGE BASE - ELIMU NJE YA CODE
     const knowledge = {
         evaluation: {
-            sw: `📚 EVALUATION (Tathmini) ni nini?\n\nEvaluation ni mchakato wa kuchunguza kwa kina kama mradi umefikia malengo yake, umeleta matokeo gani, na kama rasilimali zimetumika vizuri.\n\nAINA ZAKE:\n✓ Baseline Evaluation - kabla ya mradi\n✓ Mid-term Evaluation - katikati ya mradi\n✓ Endline/Final Evaluation - mwisho wa mradi\n✓ Impact Evaluation - athari za muda mrefu\n\nKWANINI MUHIMU? Bila evaluation, hujui kama pesa za donor zimefanya kazi au la. Donors kama USAID wanahitaji evaluation report.\n\nAt MBILAO WORLDWIDE tunafanya evaluation kwa viwango vya kimataifa. Bei $99 → Punguzo 15% = $84. Nikusaidie?`,
-            en: `📚 What is EVALUATION?\n\nEvaluation is a systematic process to examine if a project achieved its objectives, what results it brought, and if resources were used efficiently.\n\nTYPES:\n✓ Baseline - before project\n✓ Mid-term - during project\n✓ Endline/Final - at end\n✓ Impact Evaluation - long-term effects\n\nWHY IMPORTANT? Without evaluation, you don't know if donor funds worked. Donors like USAID require evaluation reports.\n\nAt MBILAO WORLDWIDE we do world-class evaluations. Price $99 → 15% OFF = $84. Need help?`
+            sw: `📚 EVALUATION (Tathmini) ni nini?\n\nEvaluation ni mchakato wa kuchunguza kwa kina kama mradi umefikia malengo yake, matokeo gani, na rasilimali zimetumika vizuri.\n\nAINA:\n✓ Baseline - kabla ya mradi\n✓ Mid-term - katikati\n✓ Endline/Final - mwisho\n✓ Impact - athari za muda mrefu\n\nKWANINI MUHIMU? Bila evaluation hujui kama pesa za donor zimefanya kazi. USAID wanahitaji report hii.\n\nAt MBILAO tunafanya evaluation ya kimataifa. Bei $99 → Punguzo 15% = $84. Nikusaidie?`,
+            en: `📚 What is EVALUATION?\n\nSystematic process to examine if project achieved objectives, results, and efficient resource use.\n\nTYPES: Baseline, Mid-term, Endline, Impact\n\nWHY? Without it you don't know if donor funds worked. USAID requires it.\n\nMBILAO world-class evaluation $99 → 15% OFF = $84. Need help?`
         },
         monitoring: {
-            sw: `📊 MONITORING (Ufuatiliaji) ni nini?\n\nNi kufuatilia mradi kila siku/kila wiki kuhakikisha shughuli zinaenda kama ilivyopangwa. Ni kama GPS ya mradi.\n\nTofauti na Evaluation, Monitoring ni ya kila siku.\n\nVifaa: Logframe, indicators, data collection tools.\n\nMBILAO tunatengeneza M&E System kamili $99 → Punguzo 15%`,
-            en: `📊 What is MONITORING?\n\nDaily/weekly tracking of project to ensure activities go as planned. Like GPS for project.\n\nUnlike Evaluation which is periodic, Monitoring is continuous.\n\nTools: Logframe, indicators, data collection.\n\nMBILAO builds full M&E System $99 → 15% OFF`
+            sw: `📊 MONITORING (Ufuatiliaji) ni nini?\n\nKufuatilia mradi kila siku/ wiki kuhakikisha shughuli zinaenda kama ilivyopangwa. Ni kama GPS ya mradi.\n\nMonitoring ni kila siku, Evaluation ni kwa vipindi.\n\nVifaa: Logframe, indicators, data collection.\n\nMBILAO M&E System kamili $99 → Punguzo 15% = $84`,
+            en: `📊 MONITORING - Daily/weekly tracking of project. Like GPS. Continuous vs Evaluation periodic. Tools: Logframe, indicators. MBILAO $99 → 15% OFF = $84`
         },
         logframe: {
-            sw: `📋 LOGFRAME ni nini?\n\nLogical Framework - jedwali linaloonyesha: Goal, Outcome, Output, Activities, Indicators, Means of Verification, Assumptions.\n\nNi moyo wa proposal zote za donors.\n\nBila logframe nzuri, hutapata funding.\n\nMBILAO tunatengeneza logframe $99 → Punguzo 15%`,
-            en: `📋 What is LOGFRAME?\n\nLogical Framework - table showing Goal, Outcome, Output, Activities, Indicators, Means of Verification, Assumptions.\n\nIt's heart of all donor proposals. Without good logframe, no funding.\n\nMBILAO creates logframe $99 → 15% OFF`
-        },
-        policy: {
-            sw: `Policy Analysis $150 → Punguzo 15% = $127.5\n\nTunachambua sera na kutoa mapendekezo ya kitaalamu kwa viwango vya kimataifa.`,
-            en: `Policy Analysis $150 → 15% OFF = $127.5 - We analyze policies with global standards.`
+            sw: `📋 LOGFRAME ni nini?\n\nLogical Framework - jedwali: Goal, Outcome, Output, Activities, Indicators, Means of Verification, Assumptions.\n\nMoyo wa proposal zote. Bila logframe nzuri hutapata funding.\n\nMBILAO tunatengeneza $99 → Punguzo 15% = $84`,
+            en: `📋 LOGFRAME - Table: Goal, Outcome, Output, Activities, Indicators, Means of Verification, Assumptions. Heart of proposals. Without it no funding. MBILAO $99 → 15% OFF`
         }
     };
 
@@ -38,42 +33,49 @@ async function startBot() {
         const m=messages[0]; if(!m.message||m.key.fromMe) return;
         const raw=m.message.conversation||m.message.extendedTextMessage?.text||"";
         const txt=raw.toLowerCase(); const from=m.key.remoteJid;
-        const isSW=txt.includes('habari')||txt.includes('nini')||txt.includes('maana')||txt.includes('ni nini')||txt.includes('elezea');
+        const isSW=txt.includes('habari')||txt.includes('nini')||txt.includes('maana')||txt.includes('bei')||txt.includes('ni nini');
 
         let reply="";
+        if(txt.includes('evaluation')||txt.includes('tathmini')) reply=isSW?knowledge.evaluation.sw:knowledge.evaluation.en;
+        else if(txt.includes('monitoring')||txt.includes('ufuatiliaji')) reply=isSW?knowledge.monitoring.sw:knowledge.monitoring.en;
+        else if(txt.includes('logframe')||txt.includes('logical')) reply=isSW?knowledge.logframe.sw:knowledge.logframe.en;
+        else if(txt.includes('grant')||txt.includes('proposal')) reply=isSW?`Grant Proposal ni kuomba pesa USAID/EU/UN. Ina background, logframe, budget. Bila nzuri hutapata pesa. MBILAO $450 → 10% = $405. Nikusaidie?`:`Grant Proposal to request funds from donors. Needs good proposal. MBILAO $450 → 10% OFF = $405`;
+        else if(txt.includes('strategic')||txt.includes('mkakati')) reply=isSW?`Strategic Plan ramani ya miaka 5: Vision, Mission, SWOT, Goals. Bila dira taasisi inapotea. MBILAO $300 → 15% = $255`:`Strategic Plan 5-year roadmap Vision Mission SWOT Goals. MBILAO $300 → 15% OFF = $255`;
+        else if(txt.includes('feasibility')) reply=isSW?`Feasibility Study utafiti kama mradi unawezekana kiuchumi, kiteknolojia. Bank zinahitaji. MBILAO $149 → 20% = $119`:`Feasibility checks viability. Banks need it. MBILAO $149 → 20% OFF = $119`;
+        else if(txt.includes('agrar')||txt.includes('agri')||txt.includes('climate')||txt.includes('mazingira')||txt.includes('shamba')) reply=isSW?`🌾 Agrarian, Environmental & Climate Smart - $99 → Punguzo 20% = $79 (BEI YA CHINI!)\n\nBila kilimo smart mazao -70%. Tunakupa mbinu za UN, +200% mavuno, funding ya climate. At MBILAO tunakusimamia hatua kwa hatua. Tuanze lini? 🌱`:`🌾 Agrarian Environmental Climate Smart $99 → 20% OFF = $79 MINIMUM! Without smart farming -70% yield. UN methods +200% yield. MBILAO full support 🌱`;
+        else if(txt.includes('market')||txt.includes('brand')||txt.includes('viral')) reply=isSW?`🔥 TRENDING #1 AI Digital Marketing & Viral - $149 → Punguzo 25% = $111! AI viral videos daily, brand WORLDWIDE, sales +500%. Bila hii biashara nyuma. MBILAO tunakufanya BRAND kubwa! 🚀`:`🔥 TRENDING #1 AI Digital Marketing & Viral $149 → 25% OFF = $111! AI viral daily, WORLDWIDE brand, +500% sales. MBILAO makes you BIG BRAND! 🚀`;
+        else if(txt.includes('price')||txt.includes('bei')||txt.includes('list')||txt.includes('punguzo')||txt.includes('huduma')){
+            reply=`🌐 MBILAO PROJECT CONSULTANT WORLDWIDE - HUDUMA 14 PREMIUM BEI CHINI $99 + PUNGUZO:
 
-        if(txt.includes('evaluation')||txt.includes('tathmini')){
-            reply = isSW? knowledge.evaluation.sw : knowledge.evaluation.en;
-        } else if(txt.includes('monitoring')||txt.includes('ufuatiliaji')){
-            reply = isSW? knowledge.monitoring.sw : knowledge.monitoring.en;
-        } else if(txt.includes('logframe')||txt.includes('logical')){
-            reply = isSW? knowledge.logframe.sw : knowledge.logframe.en;
-        } else if(txt.includes('grant')||txt.includes('proposal')){
-            reply = isSW? `Grant Proposal ni nyaraka ya kuomba pesa kwa donors (USAID, EU, UN). Ina: background, logframe, budget, methodology. Bila proposal nzuri hutapata pesa. MBILAO tunatengeneza $450 → Punguzo 10% = $405. Tunakuhakikishia viwango vya dunia. Nikusaidie?` : `Grant Proposal is document to request funds from donors. Includes background, logframe, budget. Without good proposal, no funds. MBILAO $450 → 10% OFF = $405`;
-        } else if(txt.includes('strategic')||txt.includes('mkakati')){
-            reply = isSW? `Strategic Plan ni ramani ya miaka 5 ya taasisi yako. Ina Vision, Mission, SWOT, Goals. Bila strategic plan, taasisi inatembea bila dira. MBILAO $300 → Punguzo 15% = $255. Nikupangie?` : `Strategic Plan is 5-year roadmap with Vision, Mission, SWOT, Goals. Without it, org has no direction. MBILAO $300 → 15% OFF = $255`;
-        } else if(txt.includes('feasibility')||txt.includes('upembuzi')){
-            reply = isSW? `Feasibility Study ni utafiti kama mradi unawezekana kiuchumi, kiteknolojia, kisheria. Bank zinahitaji hii kabla ya loan. MBILAO $149 → Punguzo 20% = $119` : `Feasibility Study checks if project is viable economically, technically, legally. Banks need it. MBILAO $149 → 20% OFF = $119`;
-        } else if(txt.includes('price')||txt.includes('bei')||txt.includes('punguzo')||txt.includes('list')){
-            reply = isSW?
-            `🌐 HUDUMA 14 PREMIUM - BEI YA CHINI $99:\n1. WhatsApp Bot $150-10%\n2. Website $99-15% (MIN)\n3. Automation $180-10%\n4. Mentorship $99-20%\n5. M&E $99-15%\n6. Grant $450-10%\n7. Strategic $300-15%\n8. Feasibility $149-20%\n9. Business Plan $120-10%\n10. Policy $150-15%\n11. Agrarian/Environmental/Climate $99-20% (MIN)\n12. Project Planning $250-10%\n13. AI Automation Engineer $250-15%\n14. 🔥 AI Marketing Viral $149-25% [TRENDING!]\n\nAndika neno kama 'evaluation' nikueleze maana yake nje ya bei!`
-            :
-            `🌐 14 PREMIUM SERVICES - MIN $99:\n1. Bot $150\n2. Website $99 (MIN)\n3. Automation $180\n4. Mentorship $99\n5. M&E $99\n6. Grant $450\n7. Strategic $300\n8. Feasibility $149\n9. Business Plan $120\n10. Policy $150\n11. Agrarian $99\n12. Project $250\n13. AI Engineer $250\n14. 🔥 AI Marketing $149 [TRENDING!]\n\nType word like 'evaluation' to get explanation beyond price!`;
+1. WhatsApp AI Bot 24/7 - $150 → 10% = $135
+2. Professional Website - $99 → 15% = $84 (MIN $99!)
+3. Business Automation - $180 → 10% = $162
+4. 1-on-1 Mentorship - $99 → 20% = $79 (MIN!)
+5. M&E System & Logframe - $99 → 15% = $84 (MIN!)
+6. Grant Proposal (USAID/EU/UN) - $450 → 10% = $405
+7. Strategic Plan - $300 → 15% = $255
+8. Feasibility Study - $149 → 20% = $119
+9. Bankable Business Plan - $120 → 10% = $108
+10. Policy Analysis - $150 → 15% = $127.5
+11. Agrarian/Environmental/Climate Smart - $99 → 20% = $79 (MIN!)
+12. Project Planning & Management - $250 → 10% = $225
+13. AI Automation ENGINEER - $250 → 15% = $212.5
+14. 🔥 TRENDING AI Marketing Viral - $149 → 25% = $111 [DEMAND KUBWA!]
+
+💎 BEI YA CHINI KABISA NI $99 - ZOTE PREMIUM!
+
+Andika kama 'evaluation ni nini?' nikueleze nje ya bei! At MBILAO tunakuhudumia hatua kwa hatua. Karibu sana! 🙏🌐`;
         } else {
-            // Jibu la jumla lenye elimu
-            reply = isSW?
-            `Habari! Karibu MBILAO WORLDWIDE 🌐\n\nMimi si bot wa bei tu, nina elimu pia! Uliza chochote kama:\n- "evaluation ni nini?"\n- "logframe ni nini?"\n- "monitoring maana yake?"\n- "grant proposal ni nini?"\n\nNitakueleza kwa kina nje ya code, na mwisho nitakupa ofa ya huduma husika.\n\nAu andika 'bei' kuona huduma 14 zote kuanzia $99 na punguzo!\n\nAt MBILAO tunakuhudumia hatua kwa hatua. Karibu sana! 🙏`
-            :
-            `Hello! Welcome MBILAO WORLDWIDE 🌐\n\nI'm not just price bot, I have knowledge too! Ask anything like:\n- "what is evaluation?"\n- "what is logframe?"\n- "what is monitoring?"\n\nI'll explain deeply beyond code, plus offer service discount.\n\nOr type 'price' to see 14 services from $99 with discount!\n\nFull support guaranteed. Welcome! 🙏`;
+            reply=`Habari! Karibu MBILAO WORLDWIDE 🌐\n\nMimi nina elimu nje ya bei! Uliza:\n- evaluation ni nini?\n- logframe ni nini?\n- monitoring maana?\n- grant proposal?\n\nAu andika 'bei' kuona huduma 14 kuanzia $99 na punguzo!\n\nAt MBILAO tunakuhudumia popote duniani hatua kwa hatua. Karibu! 🙏`;
         }
-
         await sock.sendMessage(from,{text:reply});
     });
 }
 startBot();
-app.get('/',(req,res)=>res.send('MBILAO KNOWLEDGE BOT 🌐 Live - /qr'));
+app.get('/',(req,res)=>res.send('MBILAO WORLDWIDE PREMIUM $99 MIN KNOWLEDGE BOT 🌐 Live - /qr'));
 app.get('/qr',(req,res)=>{
-    if(!lastQR) return res.send('<h1>MBILAO KNOWLEDGE Connected ✅ Refresh</h1>');
-    res.send(`<html><body style="text-align:center;padding-top:15px"><h1>MBILAO WORLDWIDE KNOWLEDGE BOT 🌐<br>Anajibu Nje ya Code<br>Scan 0795804621</h1><img src="${lastQR}" width="330"/></body></html>`);
+    if(!lastQR) return res.send('<html><body style="text-align:center;padding-top:50px"><h1>MBILAO CONNECTED ✅ Au Refresh 10s QR</h1><a href="/qr">Refresh QR</a></body></html>');
+    res.send(`<html><body style="text-align:center;padding-top:15px"><h1>MBILAO WORLDWIDE 🌐<br>14 HUDUMA PREMIUM MIN $99<br>KNOWLEDGE BOT + PUNGUZO<br>Scan 0795804621</h1><img src="${lastQR}" style="width:90%;max-width:350px;border:5px solid #000"/><br><br><a href="/qr" style="font-size:22px">Refresh kama ime-expire</a></body></html>`);
 });
-app.listen(10000,()=>console.log('MBILAO KNOWLEDGE Live - /qr'));
+const PORT = process.env.PORT || 10000;
+app.listen(PORT,()=>console.log('MBILAO KNOWLEDGE Live on '+PORT+' - /qr'));
