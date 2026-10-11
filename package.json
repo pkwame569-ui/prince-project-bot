@@ -1,18 +1,10 @@
+
 {
   "name": "prince-project-bot",
   "version": "1.0.0",
-  "description": "MBILAO PROJECT CONSULTANT WORLDWIDE - 14 PREMIUM SERVICES KNOWLEDGE BOT MIN $99",
+  "description": "MBILAO WORLDWIDE QR ONLY",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "keywords": [
-    "whatsapp",
-    "bot",
-    "mbilao",
-    "worldwide",
-    "knowledge"
-  ],
+  "scripts": { "start": "node index.js" },
   "author": "MBILAO WORLDWIDE",
   "license": "MIT",
   "dependencies": {
