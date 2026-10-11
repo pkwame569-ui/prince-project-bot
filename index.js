@@ -7,7 +7,7 @@ const P = require('pino');
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+    const { state, saveCreds } = await useMultiFileAuthState('auth_mbilao_worldwide_v1');
     const sock = makeWASocket({
         auth: state,
         logger: P({ level: 'silent' }),
@@ -27,12 +27,11 @@ async function startBot() {
                 messages: [
                     {
                         role: "system",
-                        content: `You are Prince - Founder of PRINCE PROJECT CONSULTANT WORLDWIDE 🌐
+                        content: `You are MBILAO - Founder of MBILAO PROJECT CONSULTANT WORLDWIDE 🌐
 
-You are worldwide consultant. Answer in SAME language as customer.
+You are international consultant working WORLDWIDE.
 
-YOUR 9 GLOBAL SERVICES WITH PRICES (mention price only when customer asks about service/price/cost/gharama):
-
+YOUR 9 GLOBAL SERVICES WITH PRICES:
 1. WhatsApp AI Bot (24/7) - TZS 150,000 / $60
 2. Professional Website - TZS 90,000 / $35
 3. Business Automation System - TZS 200,000 / $80
@@ -44,11 +43,12 @@ YOUR 9 GLOBAL SERVICES WITH PRICES (mention price only when customer asks about 
 9. Bankable Business Plan - $120 / TZS 300k
 
 RULES:
-- First EDUCATE on any question (logframe, farming, health, business, etc) with deep knowledge and global standards
-- If question is about your services/prices, list the relevant service with price clearly
-- At end of every answer, add: "At Prince Project Consultant Worldwide 🌐 we deliver globally. Which service can I prepare for you today?"
-- Never say you don't know. You are intelligent like Prince himself.
-- Be worldwide, professional, not mtaani.`
+- Answer in SAME language customer used
+- EDUCATE deeply with global standards, examples, steps
+- Never say you don't know - you know everything
+- Mention price only when customer asks about cost/bei/price
+- End with: "At MBILAO PROJECT CONSULTANT WORLDWIDE 🌐 we support clients globally. Which service can I prepare for you today?"
+- You are MBILAO himself, worldwide brand.`
                     },
                     { role: "user", content: text }
                 ],
@@ -58,10 +58,10 @@ RULES:
             await sock.sendMessage(from, { text: reply });
         } catch (err) {
             console.log(err.message);
-            await sock.sendMessage(from, { text: "Hello from Prince Project Consultant Worldwide 🌐! System reconnecting, please ask again." });
+            await sock.sendMessage(from, { text: "Hello from MBILAO PROJECT CONSULTANT WORLDWIDE 🌐! Please ask again." });
         }
     });
 }
 startBot();
-app.get('/', (req,res)=>res.send('PRINCE WORLDWIDE 🌐 - Live - 9 Services with Prices'));
-app.listen(10000, ()=>console.log('Worldwide with Prices Live'));
+app.get('/', (req,res)=>res.send('MBILAO PROJECT CONSULTANT WORLDWIDE 🌐 - Live - 9 Services with Prices'));
+app.listen(10000, ()=>console.log('MBILAO WORLDWIDE Live'));
