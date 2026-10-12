@@ -2,14 +2,17 @@ const express = require('express');
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const QRCode = require('qrcode');
 const pino = require('pino');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
 let sockGlobal = null;
 let lastQr = null;
+let isStarting = false;
 const userMemory = new Map();
 
+// 7 SERVICES - BILA DONATION & AGRARIUM
 const SERVICES = `
 🌐 MBILAO PROJECT CONSULTANT WORLDWIDE 🌐
 
@@ -17,25 +20,22 @@ const SERVICES = `
    Business, Portfolio, E-commerce
 
 2️⃣ WHATSAPP BOT $150-$350
-   Auto-reply 24/7, Pair Code, QR
+   Auto-reply 24/7, QR & Pair Code
 
 3️⃣ AI MARKETING VIRAL $149-$1111
    AI content, Viral video, +500% sales
 
-4️⃣ AGRARIUM SYSTEM $99-$479
-   Smart farming / Kilimo smart
-
-5️⃣ GRANT WRITING $450-$1405
+4️⃣ GRANT WRITING $450-$1405
    Project funding worldwide
 
-6️⃣ TATHMINI / EVALUATION $99
-   Professional evaluation
+5️⃣ TATHMINI / EVALUATION $99
+   Professional project evaluation
 
-7️⃣ AI AUTOMATION MENTORSHIP $199-$999
-   Learn AI, Automate business, 1-on-1 coaching / Mafunzo ya AI
+6️⃣ AI AUTOMATION MENTORSHIP $199-$999
+   Learn AI, Automate business, 1-on-1 coaching
 
-8️⃣ PROJECTS PLANNING & MANAGEMENT $149-$1299
-   Proposal, Planning, Monitoring, Reporting / Usimamizi wa miradi
+7️⃣ PROJECTS PLANNING & MANAGEMENT $149-$1299
+   Proposal, Planning, Monitoring, Reporting
 
 📞 0795804621 / WhatsApp: 255795804621
 🌐 Worldwide Consultant
@@ -43,105 +43,77 @@ const SERVICES = `
 
 const deep = {
   evaluation: {
-    0: `${SERVICES}\n\n**EVALUATION / TATHMINI Level 1**
-Uchunguzi wa kitaalamu - Je mradi umefikia malengo?
-Professional check if project achieved goals.
-
-Type "eleza zaidi / explain more"`,
-    1: `**EVALUATION Level 2 - KINA / DEEP**
-Hatua 4: Input-Process-Output-Impact. AI analysis haraka!
-Type "zaidi / more" for Level 3`,
-    2: `**EVALUATION Level 3 - EXPERT**
-Full report + Recommendations $99 only!
-Contact: 0795804621 - MBILAO WORLDWIDE🌐`
+    0: `${SERVICES}\n\n**EVALUATION / TATHMINI Level 1**\nUchunguzi wa kitaalamu wa mradi.\nType "eleza zaidi"`,
+    1: `**EVALUATION Level 2 - KINA**\nInput-Process-Output-Impact. AI analysis!\nType "zaidi"`,
+    2: `**EVALUATION Level 3 - EXPERT**\nFull report + Recommendations $99!\n0795804621 WORLDWIDE🌐`
   },
   planning: {
-    0: `${SERVICES}\n\n**PROJECTS PLANNING & MANAGEMENT Level 1**
-Usimamizi wa miradi kitaalamu / Professional project management.
-Proposal, Budget, Logframe, Monitoring!
-
-Bila plan = kushindwa! No plan = fail!
-
-Type "eleza zaidi / explain more"`,
-    1: `**PLANNING Level 2 - KINA**
-Tunafanya / We do:
-- Project Proposal / Andiko la mradi
-- Workplan & Budget / Mpango kazi na bajeti
-- Monitoring & Evaluation / Ufuatiliaji
-- Final Report / Ripoti ya mwisho
-
-Type "zaidi / more"`,
-    2: `**PLANNING Level 3 - OFFER / OFA**
-Proposal kamili + Budget + Logframe = $149 only!
-Grant-winning formula!
-
-Contact: 0795804621 - MBILAO PROJECT CONSULTANT WORLDWIDE🌐`
+    0: `${SERVICES}\n\n**PLANNING & MANAGEMENT Level 1**\nUsimamizi wa miradi kitaalamu!\nProposal, Budget, Logframe!\nType "eleza zaidi"`,
+    1: `**PLANNING Level 2**\nProposal, Workplan, Budget, Monitoring, Report!\nType "zaidi"`,
+    2: `**PLANNING Level 3 - OFFER**\nProposal kamili + Budget + Logframe = $149!\n0795804621 WORLDWIDE🌐`
   },
   mentorship: {
-    0: `${SERVICES}\n\n**AI AUTOMATION MENTORSHIP Level 1**
-Jifunze AI, automate biashara yako!
-Learn AI, automate your business!
-
-Mentorship 1-on-1, WhatsApp bot, AI tools, Viral marketing!
-
-Type "eleza zaidi / explain more"`,
-    1: `**MENTORSHIP Level 2 - KINA**
-Utajifunza / You will learn:
-- ChatGPT for business
-- WhatsApp Automation / Auto-reply bot
-- AI Video & Content creation
-- Sales Funnel automation
-
-Result: Work 2hrs instead of 10hrs! Kazi masaa 2 badala ya 10!
-
-Type "zaidi / more"`,
-    2: `**MENTORSHIP Level 3 - VIP OFFER**
-1 Month Mentorship + Bot + Website = $299 only!
-(Instead of $1299)
-
-Nafasi 5 tu! Only 5 slots!
-Contact: 0795804621 - WORLDWIDE🌐`
+    0: `${SERVICES}\n\n**AI MENTORSHIP Level 1**\nJifunze AI, automate biashara!\nType "eleza zaidi"`,
+    1: `**MENTORSHIP Level 2**\nChatGPT, Bot, AI Video, Sales Funnel!\nKazi 2hrs badala ya 10hrs! Type "zaidi"`,
+    2: `**MENTORSHIP Level 3 - VIP**\n1 Month + Bot + Website = $299! Nafasi 5 tu!\n0795804621 WORLDWIDE🌐`
   },
   marketing: {
-    0: `${SERVICES}\n\n**AI MARKETING VIRAL Level 1**
-Bila AI biashara kama duka gizani! +500% sales!
-Type "eleza zaidi / explain more"`,
-    1: `**MARKETING Level 2**
-ChatGPT + Bot + Viral Videos + Funnel auto. 10x customers in 7 days!
-Type "zaidi / more"`,
-    2: `**MARKETING Level 3 - OFA**
-Website + Bot + Marketing = $199 only! 0795804621 WORLDWIDE🌐`
+    0: `${SERVICES}\n\n**MARKETING Level 1** +500% sales! Type "eleza zaidi"`,
+    1: `**MARKETING Level 2** Bot + Viral Videos + Funnel! Type "zaidi"`,
+    2: `**MARKETING Level 3** Website+Bot+Marketing $199! 0795804621`
   },
-  general: `${SERVICES}\n\nKaribu! Welcome! 👋\nMBILAO PROJECT CONSULTANT WORLDWIDE🌐\n\nUliza chochote / Ask anything:\n- tathmini / evaluation\n- planning / mpango wa mradi\n- mentorship / mafunzo ya AI\n- marketing / biashara\n- bei / price`
+  general: `${SERVICES}\n\nKaribu! Welcome! MBILAO WORLDWIDE🌐\nUliza: tathmini / planning / mentorship / marketing / bei`
 };
 
-app.get('/', (req,res)=>{
-  res.send(`
-    <html><body style="font-family:Arial;padding:20px;text-align:center">
-    <h1>🌐 MBILAO PROJECT CONSULTANT WORLDWIDE 🌐</h1>
-    <h2 style="color:green">LIVE 24/7 - 8 SERVICES!</h2>
-    <div style="text-align:left;max-width:600px;margin:auto;background:#f5f5f5;padding:20px;border-radius:12px">
-    <p>1. Website $99-$484</p>
-    <p>2. WhatsApp Bot $150-$350</p>
-    <p>3. AI Marketing Viral $149-$1111</p>
-    <p>4. Agrarium $99-$479</p>
-    <p>5. Grant Writing $450-$1405</p>
-    <p>6. Evaluation $99</p>
-    <p><b style="color:blue">7. AI Automation Mentorship $199-$999 ⭐ NEW</b></p>
-    <p><b style="color:blue">8. Projects Planning & Management $149-$1299 ⭐ NEW</b></p>
-    <hr>
-    <p><b>📞 0795804621 / 255795804621</b></p>
-    <p><a href="/qr">QR CODE</a> | <a href="/pair">PAIR CODE</a></p>
-    </div></body></html>
-  `);
+app.get('/', (req,res)=>{ res.send(`<html><body style="text-align:center;font-family:Arial;padding:20px"><h1>🌐 MBILAO PROJECT CONSULTANT WORLDWIDE 🌐</h1><h2 style="color:green">LIVE 24/7 - 7 SERVICES!</h2><p><a href="/qr" style="background:green;color:white;padding:12px 25px;text-decoration:none;border-radius:8px">QR CODE</a> <a href="/pair" style="background:blue;color:white;padding:12px 25px;text-decoration:none;border-radius:8px">PAIR CODE</a></p><p>📞 0795804621 - Bila Donation & Agrarium</p></body></html>`); });
+app.get('/status', (req,res)=>{ res.json({bot:!!sockGlobal, qr:!!lastQr, connected: sockGlobal?.authState?.creds?.registered || false}); });
+app.get('/qr', async (req,res)=>{
+  if(sockGlobal?.authState?.creds?.registered) return res.send('<h1>CONNECTED ✓ 7 SERVICES WORLDWIDE🌐</h1>');
+  if(!lastQr){ if(!isStarting) startBot(); return res.send('<h1>Starting Bot... 15s</h1><script>setTimeout(()=>location.reload(),15000)</script>'); }
+  res.send(`<html><body style="text-align:center"><h1>SCAN QR - 7 SERVICES</h1><img src="${lastQr}" style="width:90%;max-width:380px"><br><br><a href="/pair">Use Pair Code</a></body></html>`);
 });
-
-app.get('/qr', (req,res)=>{
-  if(sockGlobal?.authState?.creds?.registered) return res.send('<h1>CONNECTED ✓ WORLDWIDE🌐 8 SERVICES LIVE</h1>');
-  if(!lastQr) return res.send('<h1>Starting... 5s</h1><script>setTimeout(()=>location.reload(),5000)</script>');
-  res.send(`<html><body style="text-align:center"><h1>MBILAO WORLDWIDE - SCAN QR</h1><img src="${lastQr}" style="width:90%;max-width:400px"><br><a href="/pair">Get Pair Code</a></body></html>`);
-});
-
 app.get('/pair', async (req,res)=>{
   try{
-    if(!sockGlobal) return res.send('<h1>Bot Starting...
+    if(!sockGlobal){ if(!isStarting) startBot(); return res.send('<h1>Bot Inaamka... 20s</h1><p>Error Connection Closed - Fixing...</p><script>setTimeout(()=>location.reload(),20000)</script>'); }
+    if(sockGlobal.authState.creds.registered) return res.send('<h1>ALREADY CONNECTED ✓ 7 SERVICES</h1>');
+    await new Promise(r=>setTimeout(r,3000));
+    const code = await sockGlobal.requestPairingCode("255795804621");
+    res.send(`<html><body style="text-align:center;font-family:Arial;padding:20px"><h1>CODE: ${code}</h1><h1 style="font-size:60px;background:black;color:#0f0;padding:20px;letter-spacing:10px;border-radius:10px">${code}</h1><p>WhatsApp > Linked Devices > Link with phone number</p><p>MBILAO WORLDWIDE🌐 7 SERVICES</p></body></html>`);
+  }catch(e){
+    lastQr=null; setTimeout(()=>{ try{ startBot() }catch{} },3000);
+    res.send(`<h1>Error: ${e.message}</h1><p>Restarting... 15s</p><script>setTimeout(()=>location.reload(),15000)</script>`);
+  }
+});
+app.get('/restart', (req,res)=>{ lastQr=null; sockGlobal=null; startBot(); res.send('<h1>Restarting... 10s</h1><script>setTimeout(()=>location.href="/qr",10000)</script>'); });
+
+async function startBot(){
+  if(isStarting) return; isStarting=true;
+  try{
+    if(!fs.existsSync('./session')) fs.mkdirSync('./session');
+    const {state, saveCreds} = await useMultiFileAuthState('./session');
+    const sock = makeWASocket({auth: state, logger: pino({level:'silent'}), printQRInTerminal:false, browser:["MBILAO WORLDWIDE","Chrome","1.0"], connectTimeoutMs:60000});
+    sockGlobal = sock;
+    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('connection.update', async (u)=>{
+      const {connection, lastDisconnect, qr} = u;
+      if(qr){ lastQr = await QRCode.toDataURL(qr); isStarting=false; }
+      if(connection==='open'){ console.log('CONNECTED ✓ 7 SERVICES'); lastQr=null; isStarting=false; }
+      if(connection==='close'){ const code = lastDisconnect?.error?.output?.statusCode; isStarting=false; lastQr=null; if(code!==DisconnectReason.loggedOut) setTimeout(startBot,5000); }
+    });
+    sock.ev.on('messages.upsert', async (m)=>{
+      const msg = m.messages[0]; if(!msg.message || msg.key.fromMe) return;
+      const raw = msg.message.conversation || msg.message.extendedTextMessage?.text || ""; const txt = raw.toLowerCase(); const from = msg.key.remoteJid;
+      if(!userMemory.has(from)) userMemory.set(from,{topic:null,depth:0}); const mem = userMemory.get(from);
+      let topic = mem.topic;
+      if(txt.includes('tathmini')||txt.includes('evaluation')) topic='evaluation';
+      else if(txt.includes('plan')||txt.includes('proposal')||txt.includes('project')||txt.includes('mpango')) topic='planning';
+      else if(txt.includes('mentor')||txt.includes('mafunzo')||txt.includes('automation')||txt.includes('fundisha')) topic='mentorship';
+      else if(txt.includes('market')||txt.includes('biashara')||txt.includes('website')||txt.includes('bot')||txt.includes('grant')) topic='marketing';
+      else if(txt.includes('bei')||txt.includes('price')||txt.includes('huduma')||txt.includes('hello')||txt.includes('hi')||txt.includes('habari')) topic='general';
+      const wantsMore = txt.includes('eleza')||txt.includes('zaidi')||txt.includes('more');
+      let reply=''; if(topic==='general') reply=deep.general; else if(deep[topic]){ if(wantsMore){ mem.depth=Math.min(mem.depth+1,2); reply=deep[topic][mem.depth]; } else{ if(topic!==mem.topic){mem.topic=topic;mem.depth=0;} reply=deep[topic][mem.depth]; } } else{ reply=`"${raw}"\n\n${deep.general}`; }
+      mem.topic=topic; userMemory.set(from,mem); await sock.sendMessage(from,{text:reply});
+    });
+  }catch(e){ isStarting=false; setTimeout(startBot,10000); }
+}
+app.listen(PORT, ()=>{ console.log('MBILAO 7 SERVICES LIVE on '+PORT); startBot(); });
