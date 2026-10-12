@@ -50,6 +50,7 @@ async function startBot() {
     };
 
     sock.ev.on('messages.upsert', async ({messages})=>{
+        
         const m=messages[0]; if(!m.message||m.key.fromMe) return;
         const raw=m.message.conversation||m.message.extendedTextMessage?.text||"";
         const txt=raw.toLowerCase().trim(); const from=m.key.remoteJid;
@@ -92,3 +93,4 @@ app.get('/pair', async (req,res)=>{
 });
 const PORT=process.env.PORT||10000;
 app.listen(PORT,()=>console.log('MBILAO FRESH Live on '+PORT));
+const app = express();
