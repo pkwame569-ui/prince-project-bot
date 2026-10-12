@@ -1,8 +1,9 @@
 {
   "name": "mbilao-project-consultant-worldwide",
-  "version": "1.0.0",
-  "description": "MBILAO PROJECT CONSULTANT WORLDWIDE - 8 Services - WhatsApp Bot 24/7",
+  "version": "2.0.0",
+  "description": "MBILAO PROJECT CONSULTANT WORLDWIDE - 7 SERVICES KNOWLEDGE BASED COMPLETE",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
