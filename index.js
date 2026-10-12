@@ -1,96 +1,55 @@
 import express from 'express'
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
 import { Boom } from '@hapi/boom'
+import QRCode from 'qrcode'
 
 const app = express()
-const PORT = 3000
+let lastQR = null
 
-// ISILALE - Keep alive
-app.get('/', (req,res) => res.send('THE MBILAO PROJECT BOT IS LIVE'))
+app.get('/', (req,res) => res.send('BOT IS LIVE - Nenda /qr ku-scan'))
 app.get('/ping', (req,res) => res.send('pong'))
-app.listen(PORT, () => console.log('Server live'))
+
+app.get('/qr', async (req,res) => {
+    if(!lastQR) return res.send('<h1>Subiri QR... Refresh page baada ya 10 sec</h1><p>Au angalia kama bot imesha-connect</p><script>setTimeout(()=>location.reload(),5000)</script>')
+    const qrImage = await QRCode.toDataURL(lastQR)
+    res.send(`<h1>Scan QR Hapa</h1><img src="${qrImage}" width="300"/><p>WhatsApp > Linked Devices > Link Device</p><script>setTimeout(()=>location.reload(),15000)</script>`)
+})
+
+app.listen(3000)
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info')
-    const sock = makeWASocket({ auth: state, printQRInTerminal: true })
+    const sock = makeWASocket({ auth: state, printQRInTerminal: false })
     sock.ev.on('creds.update', saveCreds)
 
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update
+        const { connection, lastDisconnect, qr } = update
+        if(qr) {
+            console.log('QR GENERATED - Fungua /qr')
+            lastQR = qr
+        }
         if(connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode!== DisconnectReason.loggedOut
             if(shouldReconnect) startBot()
         } else if(connection === 'open') {
-            console.log('✅ BOT CONNECTED')
+            console.log('✅ CONNECTED!')
+            lastQR = null
         }
     })
 
+    // Hapa chini weka code yako ile ile ya GROUP KIMYA + NIA YA MTEJA niliyokupa
     sock.ev.on('messages.upsert', async ({ messages }) => {
         const msg = messages[0]
         if (!msg.message) return
-
-        // === 1. GROUP KIMYA ===
         const jid = msg.key.remoteJid
-        if (!jid) return
-        if (jid.endsWith('@g.us')) return
-        if (jid.endsWith('@broadcast')) return
-        if (jid === 'status@broadcast') return
-        if (msg.key.fromMe) return
+        if (!jid || jid.endsWith('@g.us') || jid.endsWith('@broadcast') || msg.key.fromMe) return
 
         const textRaw = msg.message.conversation || msg.message.extendedTextMessage?.text || ""
-        const t = textRaw.toLowerCase().trim()
-        if (!t) return
+        const t = textRaw.toLowerCase()
+        if(!t) return
 
-        // === 2. ELEWA NIA ===
-        let intent = ""
-        if (t.includes("business plan") || t.includes("mpango")) intent = "business_plan"
-        else if (t.includes("company") || t.includes("kampuni") || t.includes("brela") || t.includes("usajili")) intent = "company"
-        else if (t.includes("tin") || t.includes("tax") || t.includes("kodi")) intent = "tax"
-        else if (t.includes("leseni") || t.includes("license")) intent = "license"
-        else if (t.includes("habari") || t.includes("hello") || t.includes("hi") || t.includes("help") || t.includes("msaada")) intent = "welcome"
-        else intent = "unknown"
-
-        // === 3. MAJIBU - BILINGUAL NA HAKIKISHIA ===
-        if (intent === "welcome") {
-            await sock.sendMessage(jid, { text: `Karibu / Welcome to *THE MBILAO PROJECT CO.* 🌍
-
-Tunakusaidia kuanzisha na kukuza biashara yako kisheria na kitaalamu.
-We help you start and grow your business legally & professionally.
-
-📌 *Our Services / Huduma:*
-1. Business Plan
-2. Feasibility Study
-3. Company Registration
-4. TIN & Tax
-5. BRELA
-6. License & Permits
-7. Business Proposal
-8. Strategic Plan
-9. Investment Plan
-10. Market Research
-11. Financial Projection
-12. Consultation
-
-Niko hapa kukusaidia hatua kwa hatua.
-I'm here to guide you step by step. What do you need?
-
-Mfano: "Nahitaji usajili wa kampuni" / "I need a business plan"` })
-            return
-        }
-
-        if (intent === "business_plan") {
-            await sock.sendMessage(jid, { text: `Asante! / Thank you! 🙏\nNimeelewa unahitaji *Business Plan*.\n\nNiambie biashara ni ya nini na mahali ilipo, tutaitengeneza pamoja hadi iwe tayari kwa benki.\nTell me what business and location, we'll create it together for banks & investors.` })
-            return
-        }
-
-        if (intent === "company") {
-            await sock.sendMessage(jid, { text: `Sawa kabisa! ✅\nNimeelewa unahitaji *Usajili wa Kampuni / Company Registration*.\nTutakusimamia kila hatua BRELA hadi upate cheti.\nWe'll handle everything at BRELA.\n\nJina la kampuni ni gani?\nWhat name do you want?` })
-            return
-        }
-
-        if (intent === "unknown") {
-            await sock.sendMessage(jid, { text: `Asante kwa ujumbe wako / Thank you 🙏\nNimepokea: "${textRaw}"\n\nNiko hapa kukusaidia. Fafanua kidogo unahitaji nini?\nI'm here to help. Please tell me what you need?\n\nTunatoa: Business Plan, Usajili wa Kampuni, TIN, Leseni, Ushauri.` })
-            return
+        if(t.includes("habari") || t.includes("hello") || t.includes("hi") || t.includes("help")){
+            await sock.sendMessage(jid, { text: `Karibu / Welcome to *THE MBILAO PROJECT CO.* 🌍\n\nWe help you start & grow your business.\nTunakusaidia kuanzisha biashara.\n\nServices: Business Plan, Company Registration, TIN, BRELA, License, Consultation.\n\nNiko hapa kukusaidia hatua kwa hatua. Niambie unahitaji nini?\nI'm here to guide you step by step.` })
         }
     })
 }
