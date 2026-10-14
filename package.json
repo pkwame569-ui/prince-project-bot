@@ -2,6 +2,9 @@
   "name": "mbilao-ai-bot",
   "version": "31.0.0",
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
   "dependencies": {
     "@whiskeysockets/baileys": "^6.7.0",
     "qrcode": "^1.5.3",
