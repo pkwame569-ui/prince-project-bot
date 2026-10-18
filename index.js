@@ -16,7 +16,7 @@ let qrCodeData = null;
 let isLinked = false;
 let starting = false;
 let sock = null;
-let reconnectTimer = null;
+let reconnectTimer = null;  
 
 const processedMessages = new Set();
 
