@@ -1,14 +1,33 @@
-// fixed bad mac
-const {
-    default: makeWASocket,
-    useMultiFileAuthState,
-    DisconnectReason
-} = require('@whiskeysockets/baileys');
+// fixed bad mac + auto clear + gemini 2.5 fix
+const fs = require('fs');
+['auth_info_baileys','session','baileys_auth_info','auth','prince_session'].forEach(d=>{try{if(fs.existsSync('./'+d))fs.rmSync('./'+d,{recursive:true,force:true})}catch{}}});
 
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason
+} = require('@whiskeysockets/baileys');
 const express = require('express');
 const QRCode = require('qrcode');
 const P = require('pino');
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+let qrCodeData = null;
+let isLinked = false;
+let starting = false;
+let sock = null;
+let reconnectTimer = null;
+
+const processedMessages = new Set();
+
+// GEMINI AI - SAHIHI
+const gemini = new GoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY
+});
+const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 const app = express();
 const PORT = process.env.PORT || 10000;
