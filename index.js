@@ -73,7 +73,7 @@ async function askAI(message) {
     }
 
     const response = await gemini.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.0-flash',
         contents: message,
         config: {
             systemInstruction: BUSINESS_INFO,
