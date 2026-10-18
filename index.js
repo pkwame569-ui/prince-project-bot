@@ -7,7 +7,7 @@ const {
 const express = require('express');
 const QRCode = require('qrcode');
 const P = require('pino');
-const OpenAI = require('openai');
+const { GoogleGenAI } = require('@google/genai');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -16,48 +16,105 @@ let qrCodeData = null;
 let isLinked = false;
 let starting = false;
 let sock = null;
+let reconnectTimer = null;
 
 const processedMessages = new Set();
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY
+// GEMINI AI
+const gemini = new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY
 });
 
-const BUSINESS_INFO = [
-    'You are the AI assistant for MBILAO PROJECT CONSULTANT WORLDWIDE.',
-    'Our services include:',
-    'Project proposal writing, grant writing, business plans,',
-    'feasibility studies, monitoring and evaluation, data collection,',
-    'project budgeting, strategic planning, logframes,',
-    'project management, AI chatbots and business automation.',
-    'Our clients include NGOs, CBOs, entrepreneurs and businesses.',
-    'Reply in the same language as the customer, especially',
-    'Swahili or English. Be professional, friendly and helpful.',
-    'Never invent prices or guarantee grant funding.',
-    'Ask questions when you need more information.'
-].join(' ');
+// TAARIFA ZA BIASHARA
+const BUSINESS_INFO = `
+You are the professional AI customer service assistant for
+MBILAO PROJECT CONSULTANT WORLDWIDE.
 
+BUSINESS SERVICES:
+1. Project proposal writing.
+2. Grant writing and grant application support.
+3. Business plan preparation.
+4. Feasibility studies.
+5. Monitoring and evaluation (M&E).
+6. Data collection and documentation.
+7. Project budgeting and financial narratives.
+8. Strategic planning.
+9. Logframes and theory of change.
+10. Project management and implementation plans.
+11. AI chatbots and business automation.
+
+TARGET CLIENTS:
+NGOs, CBOs, entrepreneurs, small businesses,
+community development organizations and institutions.
+
+INSTRUCTIONS:
+- Reply in the same language as the customer.
+- Prioritize Swahili and English.
+- Be professional, friendly and helpful.
+- Understand the customer's question before answering.
+- Give clear and useful answers.
+- Ask follow-up questions when necessary.
+- Explain our services accurately.
+- Never invent prices, contact details or business policies.
+- Never guarantee that a grant application will receive funding.
+- If a customer asks for a price that is not provided,
+  explain that the price depends on the requested service.
+- Help potential customers understand how our services
+  can solve their project or business problems.
+- Keep answers concise and suitable for WhatsApp.
+- Identify yourself as the AI assistant for
+  MBILAO PROJECT CONSULTANT WORLDWIDE when appropriate.
+`;
+
+// GEMINI AI FUNCTION
 async function askAI(message) {
-    const response = await openai.responses.create({
-        model: 'gpt-4.1-mini',
-        instructions: BUSINESS_INFO,
-        input: message,
-        max_output_tokens: 350
+    if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY haijawekwa kwenye Render.');
+    }
+
+    const response = await gemini.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: message,
+        config: {
+            systemInstruction: BUSINESS_INFO,
+            maxOutputTokens: 350
+        }
     });
 
-    return response.output_text ||
-        'Samahani, tafadhali jaribu tena baadaye.';
+    const answer = response.text;
+
+    if (!answer || !answer.trim()) {
+        throw new Error('Gemini haikurudisha jibu.');
+    }
+
+    return answer.trim();
 }
 
+// KUSOMA UJUMBE WA WHATSAPP
+function getMessageText(message) {
+    if (!message) return '';
+
+    return (
+        message.conversation ||
+        message.extendedTextMessage?.text ||
+        message.imageMessage?.caption ||
+        message.videoMessage?.caption ||
+        message.documentMessage?.caption ||
+        message.buttonsResponseMessage?.selectedDisplayText ||
+        message.listResponseMessage?.title ||
+        ''
+    );
+}
+
+// KUANZISHA WHATSAPP BOT
 async function startBot() {
     if (starting) return;
+
     starting = true;
 
     try {
-        const auth = await useMultiFileAuthState('auth');
-
-        const state = auth.state;
-        const saveCreds = auth.saveCreds;
+        const { state, saveCreds } =
+            await useMultiFileAuthState('auth');
 
         sock = makeWASocket({
             auth: state,
@@ -72,10 +129,9 @@ async function startBot() {
 
         sock.ev.on('creds.update', saveCreds);
 
+        // CONNECTION STATUS
         sock.ev.on('connection.update', async (update) => {
-            const connection = update.connection;
-            const lastDisconnect = update.lastDisconnect;
-            const qr = update.qr;
+            const { connection, lastDisconnect, qr } = update;
 
             if (qr) {
                 try {
@@ -89,159 +145,204 @@ async function startBot() {
             if (connection === 'open') {
                 isLinked = true;
                 qrCodeData = null;
+                starting = false;
+
+                if (reconnectTimer) {
+                    clearTimeout(reconnectTimer);
+                    reconnectTimer = null;
+                }
+
                 console.log('WHATSAPP CONNECTED SUCCESSFULLY');
             }
 
             if (connection === 'close') {
                 isLinked = false;
                 starting = false;
+                sock = null;
 
                 const statusCode =
-                    lastDisconnect &&
-                    lastDisconnect.error &&
-                    lastDisconnect.error.output &&
-                    lastDisconnect.error.output.statusCode;
+                    lastDisconnect?.error?.output?.statusCode;
 
                 console.log('WhatsApp connection closed:', statusCode);
 
-                if (statusCode !== DisconnectReason.loggedOut) {
-                    setTimeout(function () {
-                        startBot().catch(console.error);
-                    }, 5000);
-                } else {
+                if (statusCode === DisconnectReason.loggedOut) {
                     qrCodeData = null;
-                    console.log('WhatsApp logged out. Check authentication.');
+                    console.log(
+                        'WHATSAPP LOGGED OUT. Reconnect by linking again.'
+                    );
+                    return;
+                }
+
+                if (!reconnectTimer) {
+                    reconnectTimer = setTimeout(() => {
+                        reconnectTimer = null;
+                        startBot();
+                    }, 5000);
                 }
             }
         });
 
-        sock.ev.on('messages.upsert', async function (event) {
-            if (event.type !== 'notify') return;
+        // KUPOKEA NA KUJIBU UJUMBE
+        sock.ev.on('messages.upsert', async ({ messages, type }) => {
+            if (type !== 'notify') return;
 
-            for (const msg of event.messages) {
+            for (const msg of messages) {
                 try {
-                    if (!msg.message || msg.key.fromMe) continue;
+                    if (!msg.message) continue;
+                    if (msg.key.fromMe) continue;
 
                     const jid = msg.key.remoteJid;
 
+                    // Epuka makundi na status za WhatsApp
                     if (!jid) continue;
-                    if (jid === 'status@broadcast') continue;
                     if (jid.endsWith('@g.us')) continue;
+                    if (jid === 'status@broadcast') continue;
 
                     const messageId = msg.key.id;
 
-                    if (
-                        messageId &&
-                        processedMessages.has(messageId)
-                    ) {
-                        continue;
+                    if (!messageId) continue;
+                    if (processedMessages.has(messageId)) continue;
+
+                    processedMessages.add(messageId);
+
+                    // Zuia kumbukumbu isikue bila kikomo
+                    if (processedMessages.size > 1000) {
+                        const oldest =
+                            processedMessages.values().next().value;
+
+                        processedMessages.delete(oldest);
                     }
 
-                    if (messageId) {
-                        processedMessages.add(messageId);
+                    const text = getMessageText(msg.message);
 
-                        if (processedMessages.size > 1000) {
-                            processedMessages.clear();
-                        }
-                    }
-
-                    const content = msg.message;
-
-                    const text =
-                        content.conversation ||
-                        (content.extendedTextMessage &&
-                            content.extendedTextMessage.text) ||
-                        (content.imageMessage &&
-                            content.imageMessage.caption) ||
-                        (content.videoMessage &&
-                            content.videoMessage.caption);
-
-                    if (!text || !text.trim()) continue;
+                    if (!text.trim()) continue;
 
                     console.log('MESSAGE RECEIVED:', text);
-
-                    await sock.sendPresenceUpdate('composing', jid);
 
                     let reply;
 
                     try {
                         reply = await askAI(text.trim());
                     } catch (error) {
-                        console.error('OPENAI ERROR:', error.message);
+                        console.error(
+                            'GEMINI ERROR:',
+                            error.status || '',
+                            error.message
+                        );
 
                         reply =
-                            'Samahani, nina tatizo la kujibu sasa. Tafadhali jaribu tena baadaye.';
+                            'Samahani, nimeshindwa kujibu kwa sasa. ' +
+                            'Tafadhali jaribu tena baada ya muda mfupi.';
                     }
 
+                    // Tuma jibu kwa mteja
                     await sock.sendMessage(jid, {
                         text: reply
                     });
 
-                    await sock.sendPresenceUpdate('paused', jid);
-
                     console.log('REPLY SENT SUCCESSFULLY');
 
                 } catch (error) {
-                    console.error('MESSAGE ERROR:', error.message);
+                    console.error(
+                        'MESSAGE PROCESSING ERROR:',
+                        error.message
+                    );
                 }
             }
         });
 
     } catch (error) {
-        console.error('BOT STARTUP ERROR:', error.message);
         starting = false;
 
-        setTimeout(function () {
-            startBot().catch(console.error);
-        }, 10000);
+        console.error('BOT START ERROR:', error.message);
+
+        if (!reconnectTimer) {
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                startBot();
+            }, 10000);
+        }
     }
 }
 
-app.get('/', function (req, res) {
+// WEBSITE YA BOT NA QR CODE
+app.get('/', (req, res) => {
     if (isLinked) {
-        return res.send(
-            '<html><body style="text-align:center;font-family:Arial">' +
-            '<h1>MBILAO PROJECT CONSULTANT WORLDWIDE</h1>' +
-            '<h2>WhatsApp Bot Connected</h2>' +
-            '<p>Bot imeunganishwa. Unaweza kuijaribu.</p>' +
-            '</body></html>'
-        );
+        return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport"
+                      content="width=device-width, initial-scale=1">
+                <title>MBILAO AI BOT</title>
+            </head>
+            <body style="font-family:Arial;text-align:center;padding:30px">
+                <h1>MBILAO PROJECT CONSULTANT WORLDWIDE</h1>
+                <h2 style="color:green">
+                    WHATSAPP CONNECTED SUCCESSFULLY
+                </h2>
+                <p>WhatsApp bot yako iko tayari kupokea ujumbe.</p>
+            </body>
+            </html>
+        `);
     }
 
     if (qrCodeData) {
-        return res.send(
-            '<html><head><meta name="viewport" content="width=device-width,initial-scale=1">' +
-            '</head><body style="text-align:center;font-family:Arial;padding:20px">' +
-            '<h2>MBILAO PROJECT CONSULTANT WORLDWIDE</h2>' +
-            '<h3>Scan QR Code</h3>' +
-            '<img src="' + qrCodeData + '" style="width:300px;max-width:90%">' +
-            '<p>WhatsApp &gt; Linked devices &gt; Link a device</p>' +
-            '<p>Refresh ukurasa ikiwa QR imeisha muda wake.</p>' +
-            '<script>setTimeout(function(){location.reload()},25000)</script>' +
-            '</body></html>'
-        );
+        return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport"
+                      content="width=device-width, initial-scale=1">
+                <title>Unganisha WhatsApp</title>
+            </head>
+            <body style="font-family:Arial;text-align:center;padding:20px">
+                <h2>MBILAO PROJECT CONSULTANT WORLDWIDE</h2>
+                <p>Scan QR code hii kupitia WhatsApp Linked Devices.</p>
+                <img src="${qrCodeData}"
+                     alt="WhatsApp QR Code"
+                     style="width:280px;max-width:90%">
+                <p>Baada ya kuunganisha, ukurasa huu utaonyesha hali ya bot.</p>
+                <script>
+                    setTimeout(() => location.reload(), 15000);
+                </script>
+            </body>
+            </html>
+        `);
     }
 
-    return res.send(
-        '<html><head><meta name="viewport" content="width=device-width,initial-scale=1">' +
-        '</head><body style="text-align:center;font-family:Arial;padding:30px">' +
-        '<h2>MBILAO PROJECT CONSULTANT WORLDWIDE</h2>' +
-        '<p>Inasubiri WhatsApp QR Code...</p>' +
-        '<p>Subiri sekunde 10.</p>' +
-        '<script>setTimeout(function(){location.reload()},10000)</script>' +
-        '</body></html>'
-    );
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport"
+                  content="width=device-width, initial-scale=1">
+            <title>MBILAO AI BOT</title>
+        </head>
+        <body style="font-family:Arial;text-align:center;padding:30px">
+            <h2>MBILAO PROJECT CONSULTANT WORLDWIDE</h2>
+            <p>Bot inaanza au inasubiri QR code.</p>
+            <p>Refresh ukurasa huu baada ya sekunde chache.</p>
+            <script>
+                setTimeout(() => location.reload(), 5000);
+            </script>
+        </body>
+        </html>
+    `);
 });
 
-app.get('/health', function (req, res) {
+// HEALTH CHECK
+app.get('/health', (req, res) => {
     res.json({
-        service: 'running',
+        service: 'MBILAO AI BOT',
         whatsappConnected: isLinked,
-        qrReady: Boolean(qrCodeData)
+        aiProvider: 'Google Gemini',
+        status: 'running'
     });
 });
 
-app.listen(PORT, '0.0.0.0', function () {
-    console.log('MBILAO SERVER RUNNING ON PORT ' + PORT);
-    startBot().catch(console.error);
+// KUWASHA SERVER
+app.listen(PORT, '0.0.0.0', () => {
+    console.log('MBILAO AI BOT SERVER RUNNING ON PORT', PORT);
+    startBot();
 });
