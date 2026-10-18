@@ -1,3 +1,4 @@
+// fixed bad mac
 const {
     default: makeWASocket,
     useMultiFileAuthState,
