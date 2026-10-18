@@ -1,6 +1,11 @@
+
 // fixed bad mac + auto clear + gemini 2.5 fix
 const fs = require('fs');
-['auth_info_baileys','session','baileys_auth_info','auth','prince_session'].forEach(d=>{try{if(fs.existsSync('./'+d))fs.rmSync('./'+d,{recursive:true,force:true})}catch{}}});
+try {
+  ['auth_info_baileys','session','baileys_auth_info','auth','prince_session'].forEach(d=>{
+    if(fs.existsSync('./'+d)) fs.rmSync('./'+d,{recursive:true,force:true});
+  });
+} catch {}
 
 const {
   default: makeWASocket,
@@ -28,23 +33,6 @@ const gemini = new GoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY
 });
 const model = gemini.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-const app = express();
-const PORT = process.env.PORT || 10000;
-
-let qrCodeData = null;
-let isLinked = false;
-let starting = false;
-let sock = null;
-let reconnectTimer = null;  
-
-const processedMessages = new Set();
-
-// GEMINI AI
-const gemini = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY
-});
-
 // TAARIFA ZA BIASHARA
 const BUSINESS_INFO = `
 You are the professional AI customer service assistant for
