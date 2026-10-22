@@ -1,3 +1,5 @@
+const SHEET_API = "https://script.google.com/macros/s/AKfycbyX3Y3R3GdzNIR3hM1ZPTIiX_SX0jCSi6EWSmHaVdTpgJ4EkvpP11HhxQikhEa08sVc/exec";
+
 const {
   default: makeWASocket,
   useMultiFileAuthState,
