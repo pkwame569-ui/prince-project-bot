@@ -74,7 +74,7 @@ const genAI = new GoogleGenerativeAI(
   process.env.GEMINI_API_KEY || ''
 );
 
-const MODEL_NAME = 'gemini-3.8-flash';
+const MODEL_NAME = 'gemini-3.6-flash';
 
 
 // ======================================================
